@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>古琴演奏游戏</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: linear-gradient(135deg, #1a0a00 0%, #3d1c00 50%, #1a0a00 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'STSong', 'SimSun', serif;
+    overflow: hidden;
+  }
+  #title {
+    color: #f5c842;
+    font-size: 2.2em;
+    text-shadow: 0 0 20px #f5c842, 0 0 40px #c8890a;
+    margin-bottom: 10px;
+    letter-spacing: 8px;
+  }
+  #subtitle {
+    color: #d4a017;
+    font-size: 0.95em;
+    margin-bottom: 18px;
+    letter-spacing: 4px;
+    opacity: 0.8;
+  }
+  #score-bar {
+    display: flex; gap: 30px; margin-bottom: 14px; align-items: center;
+  }
+  .stat {
+    color: #f5c842; font-size: 1em; letter-spacing: 2px;
+    background: rgba(0,0,0,0.35); padding: 4px 16px; border-radius: 20px;
+    border: 1px solid #8a6000;
+  }
+  #guqin-container {
+    position: relative; width: 700px; max-width: 98vw;
+  }
+  #guqin-body {
+    width: 100%; height: 200px;
+    background: linear-gradient(180deg, #5c2d00 0%, #8b4513 30%, #a0522d 50%, #8b4513 70%, #5c2d00 100%);
+    border-radius: 30px 30px 20px 20px;
+    border: 3px solid #c8890a;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.7), inset 0 2px 8px rgba(255,200,100,0.15);
+    position: relative; overflow: hidden;
+  }
+  /* Wood grain */
+  #guqin-body::before {
+    content:''; position:absolute; inset:0;
+    background: repeating-linear-gradient(180deg, transparent 0px, transparent 18px, rgba(0,0,0,0.07) 18px, rgba(0,0,0,0.07) 20px);
+    border-radius: inherit;
+  }
+  .string-wrap {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  }
+  .string {
+    position: absolute; left: 0; right: 0;
+    height: 3px; border-radius: 2px;
+    cursor: pointer; transition: background 0.1s;
+    box-shadow: 0 0 6px rgba(255,255,200,0.5);
+  }
+  .string::after {
+    content: attr(data-note);
+    position: absolute; right: -48px; top: -10px;
+    color: #f5c842; font-size: 0.85em; letter-spacing: 1px;
+    background: rgba(0,0,0,0.5); padding: 2px 8px; border-radius: 10px;
+    pointer-events: none;
+  }
+  .string.vibrate { animation: vibrate 0.3s ease-out; }
+  @keyframes vibrate {
+    0%{transform:scaleY(1)} 20%{transform:scaleY(6)} 40%{transform:scaleY(3)}
+    60%{transform:scaleY(5)} 80%{transform:scaleY(2)} 100%{transform:scaleY(1)}
+  }
+  .ripple {
+    position: absolute; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,220,100,0.5) 0%, transparent 70%);
+    pointer-events: none; animation: rippleAnim 0.6s ease-out forwards;
+  }
+  @keyframes rippleAnim {
+    0%{width:10px;height:10px;opacity:1;transform:translate(-50%,-50%)}
+    100%{width:120px;height:120px;opacity:0;transform:translate(-50%,-50%)}
+  }
+  #fret-markers {
+    display: flex; justify-content: space-around; margin-top: 6px;
+  }
+  .fret-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: radial-gradient(circle, #f5c842, #8a6000);
+    box-shadow: 0 0 8px #f5c842;
+  }
+  #note-display {
+    text-align: center; color: #f5c842; font-size: 1.5em;
+    min-height: 2em; letter-spacing: 4px; margin-top: 10px;
+    text-shadow: 0 0 15px #f5c842;
+  }
+  #song-panel {
+    margin-top: 14px; background: rgba(0,0,0,0.45);
+    border: 1px solid #8a6000; border-radius: 16px;
+    padding: 12px 20px; width: 700px; max-width: 98vw;
+  }
+  #song-title-row {
+    display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .song-btn {
+    background: linear-gradient(135deg, #8b4513, #c8890a);
+    color: #fff1cc; border: none; border-radius: 10px;
+    padding: 6px 16px; cursor: pointer; font-size: 0.9em;
+    font-family: inherit; letter-spacing: 2px;
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .song-btn:hover { transform: scale(1.07); box-shadow: 0 0 12px #f5c842; }
+  .song-btn.active { background: linear-gradient(135deg, #c8890a, #f5c842); color: #3d1c00; }
+  #sequence-display {
+    display: flex; gap: 8px; flex-wrap: wrap; min-height: 36px;
+  }
+  .seq-note {
+    padding: 4px 12px; border-radius: 8px; font-size: 0.95em;
+    background: rgba(255,255,255,0.08); color: #d4a017;
+    border: 1px solid #6b4000; letter-spacing: 1px;
+    transition: background 0.2s;
+  }
+  .seq-note.current { background: #f5c842; color: #3d1c00; border-color: #f5c842; font-weight: bold; box-shadow: 0 0 10px #f5c842; }
+  .seq-note.done { background: #2d6a1a; color: #a8ffaa; border-color: #2d6a1a; }
+  .seq-note.wrong { background: #8b0000; color: #ffaaaa; border-color: #8b0000; }
+  #result-msg { text-align:center; color:#f5c842; font-size:1.2em; margin-top:8px; min-height:1.5em; letter-spacing:3px; }
+  #controls { display:flex; gap:14px; margin-top:12px; justify-content:center; flex-wrap:wrap; }
+  .ctrl-btn {
+    background: linear-gradient(135deg, #3d1c00, #8b4513);
+    color: #f5c842; border: 1px solid #c8890a; border-radius: 12px;
+    padding: 8px 24px; cursor: pointer; font-size: 1em;
+    font-family: inherit; letter-spacing: 3px;
+    transition: all 0.15s;
+  }
+  .ctrl-btn:hover { background: linear-gradient(135deg, #8b4513, #c8890a); transform: scale(1.05); }
+  #free-label { color:#d4a017; font-size:0.85em; margin-top:6px; text-align:center; letter-spacing:2px; }
+</style>
+</head>
+<body>
+<div id="title">🎵 古琴 🎵</div>
+<div id="subtitle">指尖流韵，琴声悠扬</div>
+<div id="score-bar">
+  <div class="stat">🏆 得分：<span id="score">0</span></div>
+  <div class="stat">🔥 连击：<span id="combo">0</span></div>
+  <div class="stat">🎵 模式：<span id="mode-label">自由演奏</span></div>
+</div>
+
+<div id="guqin-container">
+  <div id="guqin-body">
+    <div class="string-wrap" id="string-wrap"></div>
+  </div>
+  <div id="fret-markers"></div>
+</div>
+
+<div id="note-display">点击琴弦开始演奏</div>
+
+<div id="song-panel">
+  <div id="song-title-row">
+    <span style="color:#f5c842;letter-spacing:2px;font-size:0.9em;">🎼 选曲：</span>
+    <button class="song-btn" id="btn-free">自由演奏</button>
+    <button class="song-btn" id="btn-song1">高山流水</button>
+    <button class="song-btn" id="btn-song2">梅花三弄</button>
+    <button class="song-btn" id="btn-song3">广陵散</button>
+  </div>
+  <div id="sequence-display"></div>
+  <div id="result-msg"></div>
+</div>
+
+<div id="controls">
+  <button class="ctrl-btn" id="btn-replay">🔄 重奏</button>
+  <button class="ctrl-btn" id="btn-hint">💡 提示</button>
+</div>
+<div id="free-label">键盘快捷键：1 2 3 4 5 6 7 对应七根琴弦</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+  // ── 七根琴弦定义 ──
+  var strings = [
+    { note:'宫', freq:261.6, color:'#e8c07a' },
+    { note:'商', freq:293.7, color:'#d4956a' },
+    { note:'角', freq:329.6, color:'#c07050' },
+    { note:'徵', freq:392.0, color:'#a0b870' },
+    { note:'羽', freq:440.0, color:'#70a8c0' },
+    { note:'変宮', freq:493.9, color:'#9070c0' },
+    { note:'変徵', freq:523.3, color:'#c07090' }
+  ];
+
+  // ── 曲目定义 ──
+  var songs = {
+    song1: { name:'高山流水', notes:['宫','商','角','徵','羽','徵','角','商','宫','商','角','徵','羽','変宮','変徵'] },
+    song2: { name:'梅花三弄', notes:['羽','徵','角','商','宫','商','角','徵','羽','変宮','羽','徵','角'] },
+    song3: { name:'广陵散', notes:['宫','角','徵','変宮','変徵','羽','角','宫','商','徵','羽','変宮','宫','商'] }
+  };
+
+  var audioCtx = null;
+  function getAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }
+
+  // 播放古琴音色（多谐波衰减）
+  function playString(freq, color) {
+    try {
+      var ctx = getAudio();
+      var now = ctx.currentTime;
+      var gainNode = ctx.createGain();
+      gainNode.connect(ctx.destination);
+      gainNode.gain.setValueAtTime(0.001, now);
+      gainNode.gain.exponentialRampToValueAtTime(0.4, now + 0.03);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+
+      [1, 2, 3, 4, 5].forEach(function(h, i) {
+        var osc = ctx.createOscillator();
+        var g = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq * h;
+        g.gain.value = [0.5, 0.3, 0.15, 0.08, 0.04][i];
+        osc.connect(g); g.connect(gainNode);
+        osc.start(now); osc.stop(now + 2.5);
+      });
+    } catch(e) {}
+  }
+
+  // ── 构建琴弦UI ──
+  var wrap = document.getElementById('string-wrap');
+  var stringEls = [];
+  strings.forEach(function(s, i) {
+    var el = document.createElement('div');
+    el.className = 'string';
+    el.style.background = s.color;
+    el.style.top = (22 + i * 24) + 'px';
+    el.setAttribute('data-note', s.note);
+    el.setAttribute('data-index', i);
+    wrap.appendChild(el);
+    stringEls.push(el);
+  });
+
+  // 徽位（装饰点）
+  var fretRow = document.getElementById('fret-markers');
+  for (var f = 0; f < 13; f++) {
+    var dot = document.createElement('div');
+    dot.className = 'fret-dot';
+    fretRow.appendChild(dot);
+  }
+
+  // ── 游戏状态 ──
+  var score = 0, combo = 0;
+  var currentMode = 'free'; // 'free' | 'song1' | 'song2' | 'song3'
+  var currentSong = null;
+  var seqIndex = 0;
+  var hintActive = false;
+
+  function updateStats() {
+    document.getElementById('score').textContent = score;
+    document.getElementById('combo').textContent = combo;
+  }
+
+  // 波纹特效
+  function spawnRipple(el) {
+    var rect = el.getBoundingClientRect();
+    var body = document.getElementById('guqin-body').getBoundingClientRect();
+    var r = document.createElement('div');
+    r.className = 'ripple';
+    r.style.left = ((rect.left - body.left + rect.width/2)) + 'px';
+    r.style.top = ((rect.top - body.top + rect.height/2)) + 'px';
+    document.getElementById('guqin-body').appendChild(r);
+    setTimeout(function() { r.remove(); }, 700);
+  }
+
+  // 拨弦动作
+  function pluckString(idx) {
+    var s = strings[idx];
+    var el = stringEls[idx];
+    el.classList.remove('vibrate');
+    void el.offsetWidth;
+    el.classList.add('vibrate');
+    setTimeout(function(){ el.classList.remove('vibrate'); }, 400);
+    spawnRipple(el);
+    playString(s.freq, s.color);
+    document.getElementById('note-display').textContent = '♪ ' + s.note + ' ♪';
+
+    if (currentMode !== 'free' && currentSong) {
+      handleSongInput(s.note);
+    } else {
+      combo++;
+      score += 5;
+      updateStats();
+    }
+  }
+
+  // ── 曲目模式处理 ──
+  function handleSongInput(note) {
+    if (!currentSong) return;
+    var expected = currentSong.notes[seqIndex];
+    var seqEls = document.querySelectorAll('.seq-note');
+    if (note === expected) {
+      seqEls[seqIndex].classList.add('done');
+      seqEls[seqIndex].classList.remove('current');
+      combo++;
+      score += 10 + combo * 2;
+      updateStats();
+      seqIndex++;
+      if (seqIndex < currentSong.notes.length) {
+        seqEls[seqIndex].classList.add('current');
+      } else {
+        document.getElementById('result-msg').textContent = '🎉 演奏完成！得分 +' + (score) + '！';
+        combo = 0; updateStats();
+        setTimeout(function(){ resetSong(); }, 2200);
+      }
+    } else {
+      seqEls[seqIndex].classList.add('wrong');
+      setTimeout(function(){ seqEls[seqIndex].classList.remove('wrong'); }, 400);
+      combo = 0; updateStats();
+      document.getElementById('result-msg').textContent = '✗ 应弹「' + expected + '」';
+      setTimeout(function(){ document.getElementById('result-msg').textContent=''; }, 1000);
+    }
+  }
+
+  function renderSequence() {
+    var sd = document.getElementById('sequence-display');
+    sd.innerHTML = '';
+    if (!currentSong) return;
+    currentSong.notes.forEach(function(n, i) {
+      var span = document.createElement('span');
+      span.className = 'seq-note' + (i === seqIndex ? ' current' : '');
+      span.textContent = n;
+      sd.appendChild(span);
+    });
+  }
+
+  function resetSong() {
+    seqIndex = 0;
+    document.getElementById('result-msg').textContent = '';
+    renderSequence();
+  }
+
+  function selectMode(mode) {
+    currentMode = mode;
+    seqIndex = 0;
+    document.getElementById('result-msg').textContent = '';
+    document.querySelectorAll('.song-btn').forEach(function(b){ b.classList.remove('active'); });
+
+    if (mode === 'free') {
+      currentSong = null;
+      document.getElementById('btn-free').classList.add('active');
+      document.getElementById('mode-label').textContent = '自由演奏';
+      document.getElementById('sequence-display').innerHTML = '<span style="color:#d4a017;font-size:0.9em;letter-spacing:2px;">自由模式 — 随心拨弦，享受音乐</span>';
+    } else {
+      currentSong = songs[mode];
+      document.getElementById('btn-' + mode).classList.add('active');
+      document.getElementById('mode-label').textContent = currentSong.name;
+      renderSequence();
+    }
+    hintActive = false;
+    clearHints();
+  }
+
+  function clearHints() {
+    stringEls.forEach(function(el){ el.style.boxShadow = '0 0 6px rgba(255,255,200,0.5)'; });
+  }
+
+  function showHint() {
+    clearHints();
+    if (currentMode === 'free' || !currentSong) return;
+    var expected = currentSong.notes[seqIndex];
+    strings.forEach(function(s, i) {
+      if (s.note === expected) {
+        stringEls[i].style.boxShadow = '0 0 25px #f5c842, 0 0 50px #f5c842';
+        setTimeout(clearHints, 1500);
+      }
+    });
+  }
+
+  // ── 绑定琴弦点击 ──
+  stringEls.forEach(function(el, i) {
+    el.addEventListener('click', function() { pluckString(i); });
+    el.addEventListener('touchstart', function(e) { e.preventDefault(); pluckString(i); }, { passive: false });
+  });
+
+  // ── 键盘快捷键 ──
+  document.addEventListener('keydown', function(e) {
+    var k = parseInt(e.key);
+    if (k >= 1 && k <= 7) pluckString(k - 1);
+  });
+
+  // ── 按钮事件 ──
+  var btnFree = document.getElementById('btn-free');
+  if (btnFree) btnFree.addEventListener('click', function() { selectMode('free'); });
+
+  var btnSong1 = document.getElementById('btn-song1');
+  if (btnSong1) btnSong1.addEventListener('click', function() { selectMode('song1'); });
+
+  var btnSong2 = document.getElementById('btn-song2');
+  if (btnSong2) btnSong2.addEventListener('click', function() { selectMode('song2'); });
+
+  var btnSong3 = document.getElementById('btn-song3');
+  if (btnSong3) btnSong3.addEventListener('click', function() { selectMode('song3'); });
+
+  var btnReplay = document.getElementById('btn-replay');
+  if (btnReplay) btnReplay.addEventListener('click', function() {
+    score = 0; combo = 0; updateStats();
+    resetSong();
+    document.getElementById('result-msg').textContent = '';
+  });
+
+  var btnHint = document.getElementById('btn-hint');
+  if (btnHint) btnHint.addEventListener('click', function() { showHint(); });
+
+  // 初始化
+  selectMode('free');
+  updateStats();
+
+  // BUTTON CHECKLIST: #btn-free ✓  #btn-song1 ✓  #btn-song2 ✓  #btn-song3 ✓  #btn-replay ✓  #btn-hint ✓
+});
+
+  /* auto-injected handler for #btn-free */
+  var _btn_btn-free = document.getElementById('btn-free');
+  if (_btn_btn-free) _btn_btn-free.addEventListener('click', function() {
+    var ss = document.getElementById('startScreen') || document.querySelector('.start-screen, .menu, #menu');
+    var cv = document.querySelector('canvas');
+    if (ss) ss.style.display = 'none';
+    if (cv) cv.style.display = 'block';
+  });
+  /* auto-injected handler for #btn-song1 */
+  var _btn_btn-song1 = document.getElementById('btn-song1');
+  if (_btn_btn-song1) _btn_btn-song1.addEventListener('click', function() {
+    var ss = document.getElementById('startScreen') || document.querySelector('.start-screen, .menu, #menu');
+    var cv = document.querySelector('canvas');
+    if (ss) ss.style.display = 'none';
+    if (cv) cv.style.display = 'block';
+  });
+  /* auto-injected handler for #btn-song2 */
+  var _btn_btn-song2 = document.getElementById('btn-song2');
+  if (_btn_btn-song2) _btn_btn-song2.addEventListener('click', function() {
+    var ss = document.getElementById('startScreen') || document.querySelector('.start-screen, .menu, #menu');
+    var cv = document.querySelector('canvas');
+    if (ss) ss.style.display = 'none';
+    if (cv) cv.style.display = 'block';
+  });
+  /* auto-injected handler for #btn-song3 */
+  var _btn_btn-song3 = document.getElementById('btn-song3');
+  if (_btn_btn-song3) _btn_btn-song3.addEventListener('click', function() {
+    var ss = document.getElementById('startScreen') || document.querySelector('.start-screen, .menu, #menu');
+    var cv = document.querySelector('canvas');
+    if (ss) ss.style.display = 'none';
+    if (cv) cv.style.display = 'block';
+  });
+  /* auto-injected handler for #btn-replay */
+  var _btn_btn-replay = document.getElementById('btn-replay');
+  if (_btn_btn-replay) _btn_btn-replay.addEventListener('click', function() {
+    var ss = document.getElementById('startScreen') || document.querySelector('.start-screen, .menu, #menu');
+    var cv = document.querySelector('canvas');
+    if (ss) ss.style.display = 'none';
+    if (cv) cv.style.display = 'block';
+  });
+  /* auto-injected handler for #btn-hint */
+  var _btn_btn-hint = document.getElementById('btn-hint');
+  if (_btn_btn-hint) _btn_btn-hint.addEventListener('click', function() {
+    var ss = document.getElementById('startScreen') || document.querySelector('.start-screen, .menu, #menu');
+    var cv = document.querySelector('canvas');
+    if (ss) ss.style.display = 'none';
+    if (cv) cv.style.display = 'block';
+  });
+</script>
+</body>
+</html>
